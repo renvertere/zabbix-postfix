@@ -1,0 +1,217 @@
+zabbix_export:
+  version: '6.4'
+  template_groups:
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: c65241e376494e5b9b8f0105865b6971
+      template: 'Postfix by Zabbix agent 2'
+      name: 'Postfix by Zabbix agent 2'
+      groups:
+        - name: Templates
+      items:
+        - uuid: f3963129b80e47d985d7a8d2e967a304
+          name: 'Postfix Queue Count: Active'
+          key: 'mailq-count[active]'
+          delay: 3m
+          description: 'Monitors the count of emails currently in the active queue, which are actively being processed for delivery. Checked every 3 minutes.'
+          tags:
+            - tag: target
+              value: mail
+        - uuid: bfec8e1a764f4c38ad64bc01a385f516
+          name: 'Postfix Queue Count: Bounce'
+          key: 'mailq-count[bounce]'
+          delay: 3m
+          description: 'Tracks the number of bounce messages in the bounce queue. These are messages that failed to be delivered and are being returned to the sender.'
+          tags:
+            - tag: target
+              value: mail
+        - uuid: ca2fc366c9034bd4be4155448880fce5
+          name: 'Postfix Queue Count: Deferred'
+          key: 'mailq-count[deferred]'
+          delay: 3m
+          description: 'Monitors the number of emails in the deferred queue, which have been delayed and will be retried later. This is also checked every 3 minutes.'
+          tags:
+            - tag: target
+              value: mail
+        - uuid: 2530703d8cdb48c087a0d0b0ea8ef788
+          name: 'Postfix Queue Count: Hold'
+          key: 'mailq-count[hold]'
+          delay: 3m
+          description: 'This item monitors the count of emails in the hold queue. Messages in this queue are not being processed for delivery and require manual intervention to be released.'
+          tags:
+            - tag: target
+              value: mail
+        - uuid: d45782ba56a447f1b9670274161d28da
+          name: 'Postfix Queue Count'
+          key: mailq-total
+          delay: 3m
+          description: 'This item monitors the total number of messages in the Postfix mail queue. The check runs every 3 minutes (3m), and history is kept for 90 days.'
+          tags:
+            - tag: target
+              value: mail
+          triggers:
+            - uuid: 51cb3b1048864482b1ef76e92ad5affc
+              expression: 'last(/Postfix by Zabbix agent 2/mailq-total)>{$MAILQ.AVG.LIMIT}'
+              name: 'Postfix: Queue Count is climbing'
+              opdata: 'last(/Postfix by Zabbix agent 2/mailq-total)'
+              priority: AVERAGE
+              dependencies:
+                - name: 'Postfix: Connection to SMTP Service is unavailable'
+                  expression: 'last(/Postfix by Zabbix agent 2/net.tcp.port[,25])=0'
+              tags:
+                - tag: target
+                  value: mail
+            - uuid: 64ad17223e9a4f6a96ff6556944c1320
+              expression: 'last(/Postfix by Zabbix agent 2/mailq-total)>{$MAILQ.WARN.LIMIT}'
+              name: 'Postfix: Queue Count is climbing'
+              opdata: 'last(/Postfix by Zabbix agent 2/mailq-total)'
+              priority: WARNING
+              dependencies:
+                - name: 'Postfix: Connection to SMTP Service is unavailable'
+                  expression: 'last(/Postfix by Zabbix agent 2/net.tcp.port[,25])=0'
+              tags:
+                - tag: target
+                  value: mail
+            - uuid: c2992ec50d0f497bb02d1bf10a965f5e
+              expression: 'last(/Postfix by Zabbix agent 2/mailq-total)>{$MAILQ.HIGH.LIMIT}'
+              name: 'Postfix: Queue Count is High!'
+              opdata: 'last(/Postfix by Zabbix agent 2/mailq-total)'
+              priority: HIGH
+              dependencies:
+                - name: 'Postfix: Connection to SMTP Service is unavailable'
+                  expression: 'last(/Postfix by Zabbix agent 2/net.tcp.port[,25])=0'
+              tags:
+                - tag: target
+                  value: mail
+            - uuid: ef5370176c934d0880eff14ed097cd84
+              expression: 'last(/Postfix by Zabbix agent 2/mailq-total)>{$MAILQ.DISASTER.LIMIT}'
+              name: 'Postfix: Queue Count is in a Disaster state!'
+              opdata: 'last(/Postfix by Zabbix agent 2/mailq-total)'
+              priority: DISASTER
+              dependencies:
+                - name: 'Postfix: Connection to SMTP Service is unavailable'
+                  expression: 'last(/Postfix by Zabbix agent 2/net.tcp.port[,25])=0'
+              tags:
+                - tag: target
+                  value: mail
+        - uuid: 5caa7fe5a22e42a3905dc3e992844cf0
+          name: 'Postfix Service Status'
+          key: 'net.tcp.port[,25]'
+          delay: 3m
+          valuemap:
+            name: 'Postfix Service Availability'
+          tags:
+            - tag: target
+              value: mail
+          triggers:
+            - uuid: e199c0f2374149d4b5479d6e43c43277
+              expression: 'last(/Postfix by Zabbix agent 2/net.tcp.port[,25])=0'
+              name: 'Postfix: Connection to SMTP Service is unavailable'
+              opdata: 'last(/Postfix by Zabbix agent 2/net.tcp.port[,25])'
+              priority: DISASTER
+              manual_close: 'YES'
+              dependencies:
+                - name: 'Postfix Master Process is Offline!'
+                  expression: 'last(/Postfix by Zabbix agent 2/proc.num[master])=0'
+              tags:
+                - tag: target
+                  value: mail
+        - uuid: c9bd461cc580456191c3445073d97bde
+          name: 'Postfix Startup Status'
+          key: postfix.startup
+          delay: 3m
+          valuemap:
+            name: 'Postfix Service Availability'
+          preprocessing:
+            - type: REGEX
+              parameters:
+                - enabled
+                - '1'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '0'
+          tags:
+            - tag: target
+              value: mail
+          triggers:
+            - uuid: f5c8819476f045bb9a6a50d8e97428eb
+              expression: 'last(/Postfix by Zabbix agent 2/postfix.startup)=0'
+              name: 'Postfix: Service not configured to Start with  Server Instance'
+              opdata: 'last(/Postfix by Zabbix agent 2/postfix.startup)'
+              priority: AVERAGE
+              tags:
+                - tag: target
+                  value: mail
+        - uuid: 74011e0a2fb14a7287c7b683e632f32e
+          name: 'Postfix Version'
+          key: postfix.version
+          delay: 24h
+          trends: '0'
+          value_type: CHAR
+          description: 'This item is used to monitor the version of the Postfix mail server running on the system. The interval for checking is set to 24 hours (24h), with data retained in history for 90 days (90d).'
+          tags:
+            - tag: target
+              value: mail
+        - uuid: 1000ea9000be432e8a8b268bdfb95c61
+          name: 'Postfix Process Master Count'
+          key: 'proc.num[master]'
+          tags:
+            - tag: target
+              value: mail
+          triggers:
+            - uuid: ff04718af6c043b2ba323082011791fd
+              expression: 'last(/Postfix by Zabbix agent 2/proc.num[master])=0'
+              name: 'Postfix Master Process is Offline!'
+              opdata: 'last(/Postfix by Zabbix agent 2/proc.num[master])'
+              priority: DISASTER
+              tags:
+                - tag: target
+                  value: mail
+        - uuid: a5ee1434f7114275893ca7f0145b1df1
+          name: 'Postfix Process Pickup Deamon Count'
+          key: 'proc.num[pickup]'
+          tags:
+            - tag: target
+              value: mail
+        - uuid: 2d5f8c4f87124ad4b31e45aaeb91697d
+          name: 'Postfix Process Queue Manager Count'
+          key: 'proc.num[qmgr]'
+          tags:
+            - tag: target
+              value: mail
+        - uuid: 569b13253e354fdab88d4fdcf0057488
+          name: 'Postfix Process SMTPD Count'
+          key: 'proc.num[smtpd]'
+          tags:
+            - tag: target
+              value: mail
+        - uuid: caa13ffb220f4fbb9b43ef1c8129ac70
+          name: 'Postfix Process TLS Session Manager Count'
+          key: 'proc.num[tlsmgr]'
+          tags:
+            - tag: target
+              value: mail
+      macros:
+        - macro: '{$MAILQ.AVG.LIMIT}'
+          value: '300'
+        - macro: '{$MAILQ.DISASTER.LIMIT}'
+          value: '500'
+        - macro: '{$MAILQ.HIGH.LIMIT}'
+          value: '400'
+        - macro: '{$MAILQ.WARN.LIMIT}'
+          value: '200'
+      valuemaps:
+        - uuid: ea909b6487da44728304ac61c4864d11
+          name: 'Postfix Service Availability'
+          mappings:
+            - value: '1'
+              newvalue: OK
+            - value: '0'
+              newvalue: PROBLEM
+        - uuid: 9a2498cda639473d94f6c427ff63500d
+          name: 'Postfix Startup Status'
+          mappings:
+            - value: '1'
+              newvalue: OK
+            - value: '0'
+              newvalue: PROBLEM

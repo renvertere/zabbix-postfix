@@ -1,0 +1,2 @@
+zabbix ALL=(ALL) NOPASSWD: /bin/find /var/spool/postfix/ -type f
+Defaults:zabbix !requiretty

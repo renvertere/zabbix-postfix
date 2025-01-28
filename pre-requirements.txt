@@ -1,0 +1,6 @@
+iniconfig
+jedi
+packaging
+parso
+pluggy
+pytest

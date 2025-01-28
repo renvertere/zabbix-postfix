@@ -1,0 +1,124 @@
+name: release-ci
+
+on:
+  push:
+    branches: 
+      - release
+  pull_request:
+    branches:
+      - release
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ubuntu:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-20.04]
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.11"
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
+    - name: Install Zabbix repository
+      run: |
+        if [[ "${{ matrix.os }}" == "ubuntu-22.04" ]]; then
+          sudo wget ${{ vars.ZABBIX_U22_REPO }}
+          sudo dpkg -i ${{ vars.ZABBIX_U22_PACKAGE }}
+        else
+          sudo wget ${{ vars.ZABBIX_U20_REPO }}
+          sudo dpkg -i ${{ vars.ZABBIX_U20_PACKAGE }}
+        fi
+        sudo apt update
+
+    - name: Set installation specifics
+      run: |
+        sudo debconf-set-selections <<< "postfix postfix/mailname string mail.server.local"
+        sudo debconf-set-selections <<< "postfix postfix/main_mailer_type string 'Internet Site'"
+        
+    - name: Install Zabbix Agent (1)
+      run: |
+        sudo apt install -y zabbix-agent zabbix-get
+
+    - name: Stop Zabbix Agent (1)
+      run: |
+        sudo systemctl stop zabbix-agent
+        
+    - name: Install Zabbix Agent (2)
+      run: |
+        sudo apt install -y zabbix-agent2 zabbix-agent2-plugin-*
+
+    - name: Stop Zabbix Agent (2)
+      run: |
+        sudo systemctl stop zabbix-agent2
+
+    - name: Install Postfix
+      run: |
+        sudo apt install -y postfix
+
+    - name: Copy Zabbix Agent mock config
+      run: |
+        sudo cp resources/zabbix/configs/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf
+        sudo cp resources/zabbix/configs/zabbix_agent2.conf /etc/zabbix/zabbix_agent2.conf
+        sudo cp resources/zabbix/userparameter/userparameter_postfix.conf /etc/zabbix/zabbix_agentd.d/userparameter_postfix.conf
+        sudo cp resources/zabbix/userparameter/userparameter_postfix.conf /etc/zabbix/zabbix_agent2.d/userparameter_postfix.conf
+        
+    - name: Test that Zabbix Configs exist
+      run: |
+        sudo ls -lash /etc/zabbix/zabbix_agentd.conf
+        sudo ls -lash /etc/zabbix/zabbix_agent2.conf
+        sudo ls -lash /etc/zabbix/zabbix_agentd.d/userparameter_postfix.conf
+        sudo ls -lash /etc/zabbix/zabbix_agent2.d/userparameter_postfix.conf
+        
+    - name: Copy Zabbix Agent sudo config
+      run: |
+        sudo cp resources/sudoers.d/zabbix /etc/sudoers.d/zabbix
+        
+    - name: Restart Zabbix Agent (1)
+      run: |
+        sudo systemctl start zabbix-agent
+        
+    - name: Restart Zabbix Agent (2)
+      run: |
+        sudo systemctl start zabbix-agent2
+
+    - name: Fetch data with Zabbix Agent (1)
+      run: |
+        zabbix_get -s 127.0.0.1 -p 10051 -k "postfix.version"
+        zabbix_get -s 127.0.0.1 -p 10051 -k "postfix.startup"
+        zabbix_get -s 127.0.0.1 -p 10051 -k "net.tcp.port[,25]"
+        zabbix_get -s 127.0.0.1 -p 10051 -k "mailq-total"
+        zabbix_get -s 127.0.0.1 -p 10051 -k "mailq-count[active]"
+        zabbix_get -s 127.0.0.1 -p 10051 -k "mailq-count[deferred]"
+        zabbix_get -s 127.0.0.1 -p 10051 -k "mailq-count[hold]"
+        zabbix_get -s 127.0.0.1 -p 10051 -k "mailq-count[bounce]"
+        
+    - name: Fetch data with Zabbix Agent (2)
+      run: |
+        zabbix_get -s 127.0.0.1 -p 10052 -k "postfix.version"
+        zabbix_get -s 127.0.0.1 -p 10052 -k "postfix.startup"
+        zabbix_get -s 127.0.0.1 -p 10052 -k "net.tcp.port[,25]"
+        zabbix_get -s 127.0.0.1 -p 10052 -k "mailq-total"
+        zabbix_get -s 127.0.0.1 -p 10052 -k "mailq-count[active]"
+        zabbix_get -s 127.0.0.1 -p 10052 -k "mailq-count[deferred]"
+        zabbix_get -s 127.0.0.1 -p 10052 -k "mailq-count[hold]"
+        
+    - name: Test output sanity with PyTest
+      run: |
+        pytest -v
+        
+    - name: Output logs for debugging
+      run: |
+        cat /var/log/zabbix/zabbix_agentd.log
+        cat /var/log/zabbix/zabbix_agent2.log

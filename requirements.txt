@@ -1,0 +1,10 @@
+cffi
+cryptography
+iniconfig
+jedi
+packaging
+parso
+pluggy
+pycparser
+pyOpenSSL
+pytest
